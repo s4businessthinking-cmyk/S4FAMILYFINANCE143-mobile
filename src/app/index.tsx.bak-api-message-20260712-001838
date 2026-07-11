@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 
-const API_BASE_URL = "http://192.168.12.254:8000";
+const API_BASE_URL = "http://192.168.13.53:8000";
 
 type LoginUser = {
   id?: string;
@@ -77,19 +77,19 @@ export default function HomeScreen() {
       }
 
       setApiStatus("ok");
-      Alert.alert("API Connected", "Mobile app backend API à¦§à¦°à¦¤à§‡ à¦ªà¦¾à¦°à¦›à§‡à¥¤");
+      Alert.alert("API Connected", "Mobile app backend API ধরতে পারছে।");
     } catch (error) {
       setApiStatus("failed");
       Alert.alert(
         "API Connection Failed",
-        "Phone à¦¥à§‡à¦•à§‡ backend à¦§à¦°à¦¤à§‡ à¦ªà¦¾à¦°à¦›à§‡ à¦¨à¦¾à¥¤ Backend --host 0.0.0.0 à¦¦à¦¿à§Ÿà§‡ à¦šà¦¾à¦²à¦¾à¦“ à¦à¦¬à¦‚ phone + PC same Wi-Fi check à¦•à¦°à§‹à¥¤"
+        "Phone থেকে backend ধরতে পারছে না। Backend --host 0.0.0.0 দিয়ে চালাও এবং phone + PC same Wi-Fi check করো।"
       );
     }
   }
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Login Required", "Email and password à¦²à¦¿à¦–à§‡ Continue à¦šà¦¾à¦ªà§‹à¥¤");
+      Alert.alert("Login Required", "Email and password লিখে Continue চাপো।");
       return;
     }
 
@@ -121,7 +121,7 @@ export default function HomeScreen() {
       if (!data.access_token) {
         Alert.alert(
           "Login Response Issue",
-          "Backend response à¦à¦¸à§‡à¦›à§‡, à¦•à¦¿à¦¨à§à¦¤à§ access_token à¦ªà¦¾à¦“à§Ÿà¦¾ à¦¯à¦¾à§Ÿà¦¨à¦¿à¥¤"
+          "Backend response এসেছে, কিন্তু access_token পাওয়া যায়নি।"
         );
         return;
       }
@@ -139,7 +139,7 @@ export default function HomeScreen() {
       setApiStatus("failed");
       Alert.alert(
         "Network Error",
-        "Login request backend-à¦ à¦¯à§‡à¦¤à§‡ à¦ªà¦¾à¦°à§‡à¦¨à¦¿à¥¤ PC backend à¦šà¦¾à¦²à§ à¦†à¦›à§‡ à¦•à¦¿à¦¨à¦¾, IP à¦ à¦¿à¦• à¦†à¦›à§‡ à¦•à¦¿à¦¨à¦¾, firewall allow à¦†à¦›à§‡ à¦•à¦¿à¦¨à¦¾ check à¦•à¦°à§‹à¥¤"
+        "Login request backend-এ যেতে পারেনি। PC backend চালু আছে কিনা, IP ঠিক আছে কিনা, firewall allow আছে কিনা check করো।"
       );
     } finally {
       setIsLoginLoading(false);
@@ -149,7 +149,7 @@ export default function HomeScreen() {
   function handleOfflineMode() {
     Alert.alert(
       "Offline Mode",
-      "Offline-first mobile mode ready. Next phase-à¦ token storage + SQLite local DB connect à¦•à¦°à¦¾ à¦¹à¦¬à§‡."
+      "Offline-first mobile mode ready. Next phase-এ token storage + SQLite local DB connect করা হবে."
     );
   }
 
@@ -175,7 +175,7 @@ export default function HomeScreen() {
           <Text style={styles.splashLoadingText}>Loading {progress}%</Text>
 
           <Text style={styles.splashFooter}>
-            React Native / Expo â€¢ FastAPI â€¢ PostgreSQL â€¢ SQLite Sync
+            React Native / Expo • FastAPI • PostgreSQL • SQLite Sync
           </Text>
         </View>
       </SafeAreaView>
@@ -231,7 +231,7 @@ export default function HomeScreen() {
             <Text style={styles.title}>S4 FAMILY{"\n"}FINANCE</Text>
             <Text style={styles.subtitle}>
               Login to manage family accounts, wallets, transactions, reports
-              and audit â€” even when internet is unavailable.
+              and audit — even when internet is unavailable.
             </Text>
 
             <View style={styles.systemRow}>
@@ -252,7 +252,7 @@ export default function HomeScreen() {
 
             {loginUser ? (
               <View style={styles.successBox}>
-                <Text style={styles.successTitle}>Login Connected âœ…</Text>
+                <Text style={styles.successTitle}>Login Connected ✅</Text>
                 <Text style={styles.successText}>
                   {loginUser.full_name ||
                     loginUser.name ||
@@ -312,7 +312,7 @@ export default function HomeScreen() {
               onPress={() =>
                 Alert.alert(
                   "Forgot Password",
-                  "Next phase-à¦ forgot password backend flow connect à¦•à¦°à¦¾ à¦¹à¦¬à§‡."
+                  "Next phase-এ forgot password backend flow connect করা হবে."
                 )
               }
             >
@@ -322,20 +322,20 @@ export default function HomeScreen() {
 
           <View style={styles.featureGrid}>
             <View style={styles.featureCard}>
-              <Text style={styles.featureIcon}>ðŸ”‘</Text>
+              <Text style={styles.featureIcon}>🔑</Text>
               <Text style={styles.featureTitle}>Auth</Text>
               <Text style={styles.featureText}>FastAPI login endpoint</Text>
             </View>
 
             <View style={styles.featureCard}>
-              <Text style={styles.featureIcon}>ðŸ“´</Text>
+              <Text style={styles.featureIcon}>📴</Text>
               <Text style={styles.featureTitle}>Offline</Text>
               <Text style={styles.featureText}>Token storage coming next</Text>
             </View>
           </View>
 
           <Text style={styles.footerText}>
-            Phase 1F Preview â€¢ API login connection
+            Phase 1F Preview • API login connection
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -725,4 +725,3 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 });
-

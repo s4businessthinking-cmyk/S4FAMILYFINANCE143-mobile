@@ -2,7 +2,7 @@
     "expo":  {
                  "name":  "S4 FAMILY FINANCE",
                  "slug":  "s4-family-finance-143",
-                 "version":  "1.0.2",
+                 "version":  "1.0.3",
                  "orientation":  "portrait",
                  "icon":  "./assets/images/icon.png",
                  "scheme":  "s4familyfinance",
@@ -20,7 +20,7 @@
                                                       "monochromeImage":  "./assets/images/android-icon-monochrome.png"
                                                   },
                                  "predictiveBackGestureEnabled":  false,
-                                 "versionCode":  3
+                                 "versionCode":  4
                              },
                  "web":  {
                              "output":  "static",
