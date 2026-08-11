@@ -1,54 +1,72 @@
-﻿{
-    "expo":  {
-                 "name":  "S4 FAMILY FINANCE",
-                 "slug":  "s4-family-finance-143",
-                 "version":  "1.0.4",
-                 "orientation":  "portrait",
-                 "icon":  "./assets/images/icon.png",
-                 "scheme":  "s4familyfinance",
-                 "userInterfaceStyle":  "automatic",
-                 "ios":  {
-                             "supportsTablet":  true,
-                             "bundleIdentifier":  "com.s4familyfinance143.app"
-                         },
-                 "android":  {
-                                 "package":  "com.s4familyfinance143.app",
-                                 "adaptiveIcon":  {
-                                                      "backgroundColor":  "#07140f",
-                                                      "foregroundImage":  "./assets/images/android-icon-foreground.png",
-                                                      "backgroundImage":  "./assets/images/android-icon-background.png",
-                                                      "monochromeImage":  "./assets/images/android-icon-monochrome.png"
-                                                  },
-                                 "predictiveBackGestureEnabled":  false,
-                                 "versionCode":  5,
-                                 "usesCleartextTraffic":  true
-                             },
-                 "web":  {
-                             "output":  "static",
-                             "favicon":  "./assets/images/favicon.png"
-                         },
-                 "plugins":  [
-                                 "expo-router",
-                                 [
-                                     "expo-splash-screen",
-                                     {
-                                         "backgroundColor":  "#07140f",
-                                         "image":  "./assets/images/splash-icon.png",
-                                         "imageWidth":  76
-                                     }
-                                 ]
-                             ],
-                 "experiments":  {
-                                     "typedRoutes":  true,
-                                     "reactCompiler":  true
-                                 },
-                 "extra":  {
-                               "router":  {
-
-                                          },
-                               "eas":  {
-                                           "projectId":  "dfc31d5c-eddc-4d79-b540-05127584161c"
-                                       }
-                           }
-             }
+{
+  "expo": {
+    "name": "S4 FAMILY FINANCE",
+    "slug": "s4-family-finance-143",
+    "version": "1.0.4",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "s4familyfinance",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.s4familyfinance143.app"
+    },
+    "android": {
+      "package": "com.s4familyfinance143.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#07140f",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 5,
+      "usesCleartextTraffic": true
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#07140f",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true,
+          "enableFTS": true
+        }
+      ],
+      "expo-background-task",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow S4 Family Finance to scan grocery barcodes with the camera.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-sharing"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "apiBaseUrl": "http://127.0.0.1:8000",
+      "sentryDsn": "",
+      "eas": {
+        "projectId": "dfc31d5c-eddc-4d79-b540-05127584161c"
+      }
+    }
+  }
 }

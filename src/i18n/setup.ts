@@ -1,7 +1,10 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import arJson from "./ar.json";
 import bnJson from "./bn.json";
 import enJson from "./en.json";
+import hiJson from "./hi.json";
+import urJson from "./ur.json";
 
 let initialized = false;
 
@@ -27,10 +30,9 @@ function buildResources() {
   return {
     bn: { translation: { ...dictBn, ...bnJson } },
     en: { translation: { ...dictEn, ...enJson } },
-    // Localized dict must win over English fallback (was reversed and forced EN auth strings).
-    ar: { translation: { ...enJson, ...dictAr } },
-    hi: { translation: { ...enJson, ...dictHi } },
-    ur: { translation: { ...enJson, ...dictUr } },
+    ar: { translation: { ...dictAr, ...arJson } },
+    hi: { translation: { ...dictHi, ...hiJson } },
+    ur: { translation: { ...dictUr, ...urJson } },
   };
 }
 
