@@ -1,6 +1,9 @@
-import { RootNavigator } from "../navigation/RootNavigator";
+import { Redirect } from "expo-router";
 
-/** Expo route that mounts the full React Navigation tree (AuthStack + Drawer + MainTab). */
+/**
+ * Native React Navigation tree lives outside Expo Router for Expo Go compatibility.
+ * Open the main architecture UI at `/` instead.
+ */
 export default function RnNavRoute() {
-  return <RootNavigator />;
+  return <Redirect href="/" />;
 }

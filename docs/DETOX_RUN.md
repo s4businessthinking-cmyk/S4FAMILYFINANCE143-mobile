@@ -56,5 +56,15 @@ To reuse an already-running app/emulator during local iteration:
 npm run test:e2e -- --reuse
 ```
 
-The tests target stable React Native `testID` values and do not depend on the
-active UI language.
+## Run on USB phone (when emulator stays offline)
+
+```powershell
+Set-Location 'S:\S4-FAMILY-FINANCE-143-FINAL\mobile'
+# After a debug APK exists:
+$env:DETOX_ADB_NAME = 'd2743cea7d76'   # adb devices
+npm run test:e2e:build
+npm run test:e2e:device
+```
+
+Detox config: `android.att.debug` in `.detoxrc.js`.
+

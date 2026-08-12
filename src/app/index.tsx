@@ -28,7 +28,6 @@ import { ReportsScreen } from "../screens/ReportsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { documentScanner } from "../services/documentScanner";
 import { mlKit } from "../services/mlKit";
-import { DrawerNav } from "../navigation/DrawerNav";
 import { useAuthStore } from "../store/authStore";
 import { useFamilyStore } from "../store/familyStore";
 import { runMigrations } from "../database/migrations";
@@ -60,9 +59,22 @@ import { MobilePlannerPanel } from "../components/modules/MobilePlannerPanel";
 import { MobileNotificationsPanel } from "../components/modules/MobileNotificationsPanel";
 import { MobileZakatPanel } from "../components/modules/MobileZakatPanel";
 import { MobileArchBottomNav } from "../components/MobileArchBottomNav";
+import { MobileMoreDrawerList as DrawerNav } from "../components/MobileMoreDrawerList";
 import { MobileSplashScreen } from "../components/MobileSplashScreen";
 import { AppImages } from "../assets";
-import { loadMobileLanguage, loadMobileTheme, saveMobileLanguage, saveMobileTheme, tMobile, type MobileLang, type MobileTheme } from "../i18n";
+import {
+  LOCKED_LANGUAGES,
+  loadMobileLanguage,
+  loadMobileTheme,
+  saveMobileLanguage,
+  saveMobileTheme,
+  tMobile,
+  type MobileLang,
+  type MobileTheme,
+} from "../i18n";
+
+const AUTH_TIMEZONE_PRESETS = ["Asia/Dhaka", "Asia/Dubai", "Asia/Kolkata", "UTC"] as const;
+const AUTH_CURRENCY_PRESETS = ["BDT", "AED", "USD", "INR", "SAR"] as const;
 import {
   JOIN_RELATIONSHIPS,
   OWNER_RELATIONSHIPS,
@@ -88,16 +100,14 @@ import { loadModuleSnapshot, saveModuleSnapshot } from "../lib/offlineSnapshots"
 
 function normalizeApiBaseUrl(value: string) {
   const cleaned = value.trim().replace(/\/+$/, "");
-  if (/^https?:\/\//i.test(cleaned) && !/\/api\/v1$/i.test(cleaned)) {
-    return `${cleaned}/api/v1`;
-  }
-  return cleaned;
+  if (!/^https?:\/\//i.test(cleaned)) return cleaned;
+  return cleaned.replace(/\/api\/v1$/i, "");
 }
 
 const DEFAULT_API_BASE_URL = normalizeApiBaseUrl(
   process.env.EXPO_PUBLIC_API_BASE_URL ||
     (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
-    "http://127.0.0.1:8000",
+    "http://192.168.13.248:8000",
 );
 const API_BASE_URL_KEY = "s4_mobile_api_base_url_v1";
 const SESSION_KEY = "s4_family_finance_mobile_session_v2";
@@ -309,6 +319,7 @@ export default function HomeScreen() {
   const [joinNote, setJoinNote] = useState("");
   const [joinLinkedMemberId, setJoinLinkedMemberId] = useState("");
   const [apiBaseUrlInput, setApiBaseUrlInput] = useState(DEFAULT_API_BASE_URL);
+  const [showAdvancedServer, setShowAdvancedServer] = useState(false);
   const [token, setToken] = useState("");
   const [refreshToken, setRefreshToken] = useState("");
   const [status, setStatus] = useState<ApiStatus>("idle");
@@ -734,8 +745,17 @@ export default function HomeScreen() {
       }
       const saved = await SecureStore.getItemAsync(API_BASE_URL_KEY);
       if (saved?.trim()) {
-        setRuntimeApiBaseUrl(saved.trim());
+        const cleaned = normalizeApiBaseUrl(saved.trim());
+        // Old installs defaulted to phone-localhost; that only works with USB adb reverse.
+        const migrated =
+          cleaned === "http://127.0.0.1:8000" || cleaned === "http://localhost:8000"
+            ? DEFAULT_API_BASE_URL
+            : cleaned;
+        setRuntimeApiBaseUrl(migrated);
         setApiBaseUrlInput(getApiBaseUrl());
+        if (migrated !== cleaned) {
+          await SecureStore.setItemAsync(API_BASE_URL_KEY, migrated);
+        }
       } else {
         setApiBaseUrlInput(getApiBaseUrl());
       }
@@ -922,6 +942,14 @@ export default function HomeScreen() {
     if (!fullName.trim() || !email.trim() || !password || !familyName.trim()) {
       setMessage(tm("authFieldsRequired"));
       setStatus("failed");
+      Alert.alert(tm("authCreate"), tm("authFieldsRequired"));
+      return;
+    }
+    if (passwordStrength(password) < 1) {
+      const hint = tm("passwordRulesHint") || "Password must be at least 8 characters.";
+      setMessage(hint);
+      setStatus("failed");
+      Alert.alert(tm("authCreate"), hint);
       return;
     }
     setLoading(true);
@@ -929,7 +957,7 @@ export default function HomeScreen() {
       await persistApiBaseUrl(apiBaseUrlInput);
       const session = await ensureAuthSession();
       if (!session.access) throw new Error("No access token");
-      await apiPost(
+      const created = await apiPost(
         "/api/v1/families",
         {
           name: familyName.trim(),
@@ -939,14 +967,25 @@ export default function HomeScreen() {
         },
         session.access
       );
+      const createdFamilyId =
+        created?.family_id || created?.family?.id || created?.id || "";
       setStatus("ok");
       setMessage(tm("familyCreatedOk"));
       await persistSession(session.access, session.refresh, session.user);
-      await refreshAll(session.access);
-      setAuthMode("login");
+      if (createdFamilyId) setActiveFamilyId(String(createdFamilyId));
+      try {
+        await refreshAll(session.access);
+      } catch (refreshError) {
+        // Family already created — keep the session even if dashboard hydrate fails.
+        const refreshText =
+          refreshError instanceof Error ? refreshError.message : "Family created; dashboard refresh failed";
+        setMessage(`${tm("familyCreatedOk")} (${refreshText})`);
+      }
     } catch (error) {
       setStatus("failed");
-      setMessage(error instanceof Error ? error.message : "Create family failed");
+      const text = error instanceof Error ? error.message : "Create family failed";
+      setMessage(text);
+      Alert.alert(tm("authCreate"), text);
     } finally {
       setLoading(false);
     }
@@ -1403,6 +1442,15 @@ export default function HomeScreen() {
                 <Text style={styles.kicker}>S4 FAMILY 143</Text>
                 <Text style={styles.title}>{tm("appTitle")}</Text>
                 <Text style={styles.subtitle}>{tm("appSubtitle")}</Text>
+                <View style={styles.statusRow}>
+                  {LOCKED_LANGUAGES.map((item) => (
+                    <Pressable key={item.code} onPress={() => void changeAppLang(item.code)}>
+                      <Text style={[styles.statusPill, appLang === item.code ? styles.ok : null]}>
+                        {item.nativeName}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
               <View style={[styles.panel, dark ? styles.panelDark : null]}>
                 <View style={styles.statusRow}>
@@ -1463,7 +1511,7 @@ export default function HomeScreen() {
                     />
                     <Pressable style={styles.rememberRow} onPress={() => setRememberDevice((v) => !v)}>
                       <View style={[styles.rememberBox, rememberDevice ? styles.rememberBoxOn : null, dark ? styles.inputDark : null]}>
-                        {rememberDevice ? <Text style={styles.rememberCheck}>?</Text> : null}
+                        {rememberDevice ? <Text style={styles.rememberCheck}>✓</Text> : null}
                       </View>
                       <Text style={[styles.rememberLabel, dark ? styles.textOnDark : null]}>{tm("remember")}</Text>
                     </Pressable>
@@ -1551,21 +1599,22 @@ export default function HomeScreen() {
                       value={familyName}
                       onChangeText={setFamilyName}
                     />
-                    <TextInput
-                      style={[styles.input, dark ? styles.inputDark : null]}
-                      placeholder="Currency (BDT)"
-                      placeholderTextColor="#8aa39a"
-                      autoCapitalize="characters"
-                      value={familyCurrency}
-                      onChangeText={setFamilyCurrency}
-                    />
-                    <TextInput
-                      style={[styles.input, dark ? styles.inputDark : null]}
-                      placeholder="Timezone (Asia/Dhaka)"
-                      placeholderTextColor="#8aa39a"
-                      value={familyTimezone}
-                      onChangeText={setFamilyTimezone}
-                    />
+                    <Text style={[styles.sectionLabel, dark ? styles.textOnDark : null]}>{tm("currency") || "Currency"}</Text>
+                    <View style={styles.statusRow}>
+                      {AUTH_CURRENCY_PRESETS.map((code) => (
+                        <Pressable key={code} onPress={() => setFamilyCurrency(code)}>
+                          <Text style={[styles.statusPill, familyCurrency === code ? styles.ok : null]}>{code}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Text style={[styles.sectionLabel, dark ? styles.textOnDark : null]}>{tm("timezone")}</Text>
+                    <View style={styles.statusRow}>
+                      {AUTH_TIMEZONE_PRESETS.map((tz) => (
+                        <Pressable key={tz} onPress={() => setFamilyTimezone(tz)}>
+                          <Text style={[styles.statusPill, familyTimezone === tz ? styles.ok : null]}>{tz}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
                     <Text style={[styles.sectionLabel, dark ? styles.textOnDark : null]}>{tm("relationship")}</Text>
                     <View style={styles.statusRow}>
                       {OWNER_RELATIONSHIPS.map((rel) => (
@@ -1644,9 +1693,10 @@ export default function HomeScreen() {
                   </>
                 ) : null}
 
+                <Text style={[styles.sectionLabel, dark ? styles.textOnDark : null]}>{tm("apiBaseUrl")}</Text>
                 <TextInput
                   style={[styles.input, dark ? styles.inputDark : null]}
-                  placeholder="API URL (USB: http://127.0.0.1:8000)"
+                  placeholder="http://192.168.13.248:8000"
                   placeholderTextColor="#8aa39a"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -1654,8 +1704,8 @@ export default function HomeScreen() {
                   value={apiBaseUrlInput}
                   onChangeText={setApiBaseUrlInput}
                 />
+                <Text style={[styles.muted, dark ? styles.mutedOnDark : null]}>{tm("apiBaseHelpUsb")}</Text>
 
-                {authMode === "login" ? null : null}
                 {authMode === "create" ? (
                   <Pressable style={styles.primaryButton} onPress={createFamilyAuth} disabled={loading}>
                     <Text style={styles.primaryButtonText}>{loading ? tm("signingIn") : tm("createFamilySubmit")}</Text>
@@ -1671,10 +1721,6 @@ export default function HomeScreen() {
                     <Text style={styles.primaryButtonText}>{loading ? tm("signingIn") : tm("sendResetLink")}</Text>
                   </Pressable>
                 ) : null}
-
-                <Text style={[styles.muted, dark ? styles.mutedOnDark : null]}>
-                  Phone USB: API = http://127.0.0.1:8000 (PC e adb reverse thakte hobe). Wi-Fi: PC er LAN IP din.
-                </Text>
               </View>
             </>
           ) : (

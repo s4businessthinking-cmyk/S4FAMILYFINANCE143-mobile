@@ -13,7 +13,7 @@ module.exports = {
     "android.debug": {
       type: "android.apk",
       binaryPath: "android/app/build/outputs/apk/debug/app-debug.apk",
-      build: `cd android && ${gradleExecutable} assembleDebug assembleAndroidTest -DtestBuildType=debug`,
+      build: `cd android && ${gradleExecutable} assembleDebug assembleAndroidTest -DtestBuildType=debug -PreactNativeArchitectures=arm64-v8a`,
     },
   },
   devices: {
@@ -21,11 +21,25 @@ module.exports = {
       type: "android.emulator",
       device: { avdName: process.env.DETOX_AVD || "S4_API36" },
     },
+    attached: {
+      type: "android.attached",
+      device: { adbName: process.env.DETOX_ADB_NAME || "d2743cea7d76" },
+    },
   },
   configurations: {
     "android.emu.debug": {
       device: "emulator",
       app: "android.debug",
+    },
+    "android.att.debug": {
+      device: "attached",
+      app: "android.debug",
+      behavior: {
+        init: {
+          reinstallApp: false,
+          exposeGlobals: true,
+        },
+      },
     },
   },
 };

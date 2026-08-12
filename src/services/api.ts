@@ -6,16 +6,15 @@ import Constants from "expo-constants";
 
 function normalizeApiBaseUrl(value: string) {
   const cleaned = value.trim().replace(/\/+$/, "");
-  if (/^https?:\/\//i.test(cleaned) && !/\/api\/v1$/i.test(cleaned)) {
-    return `${cleaned}/api/v1`;
-  }
-  return cleaned;
+  if (!/^https?:\/\//i.test(cleaned)) return cleaned;
+  // Paths already include /api/v1 — base must be origin only (avoid /api/v1/api/v1/...).
+  return cleaned.replace(/\/api\/v1$/i, "");
 }
 
 const DEFAULT_BASE = normalizeApiBaseUrl(
   process.env.EXPO_PUBLIC_API_BASE_URL ||
     (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
-    "http://127.0.0.1:8000",
+    "http://192.168.13.248:8000",
 );
 
 let runtimeBase = DEFAULT_BASE;
@@ -44,7 +43,31 @@ function tunnelHeaders(): Record<string, string> {
 function detailMessage(data: any, fallback: string) {
   if (!data) return fallback;
   if (typeof data.detail === "string") return data.detail;
-  if (typeof data.detail === "object") return JSON.stringify(data.detail);
+  if (typeof data.detail === "object" && data.detail) {
+    if (Array.isArray(data.detail.password_errors)) {
+      return data.detail.password_errors.join(" · ");
+    }
+    if (typeof data.detail.message === "string") return data.detail.message;
+    return JSON.stringify(data.detail);
+  }
+  if (typeof data.error === "string") return data.error;
+  if (typeof data.error?.message === "string") {
+    const nested = data.error.message;
+    if (nested.includes("password_errors")) {
+      try {
+        const parsed = nested.replace(/^\{|\}$/g, "");
+        void parsed;
+      } catch {
+        /* ignore */
+      }
+    }
+    // Backend sometimes stringifies {'password_errors': [...]} into message
+    const pw = nested.match(/password_errors['\"]?:\s*\[([^\]]+)\]/i);
+    if (pw) {
+      return pw[1].replace(/['"]/g, "").trim();
+    }
+    return nested;
+  }
   if (typeof data.message === "string") return data.message;
   return fallback;
 }

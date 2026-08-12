@@ -11,6 +11,8 @@ type Props = {
   placeholder?: string;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   testID?: string;
+  rightIcon?: string;
+  onRightIconPress?: () => void;
 };
 
 export function Input({
@@ -23,6 +25,8 @@ export function Input({
   placeholder,
   autoCapitalize = "none",
   testID,
+  rightIcon,
+  onRightIconPress,
 }: Props) {
   return (
     <PaperInput
@@ -37,6 +41,11 @@ export function Input({
       mode="outlined"
       error={Boolean(error)}
       style={{ marginBottom: 8, backgroundColor: "#fff" }}
+      right={
+        rightIcon ? (
+          <PaperInput.Icon icon={rightIcon} onPress={onRightIconPress} forceTextInputFocus={false} />
+        ) : undefined
+      }
     />
   );
 }

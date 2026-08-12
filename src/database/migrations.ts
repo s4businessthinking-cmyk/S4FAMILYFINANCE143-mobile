@@ -6,11 +6,31 @@ import { MOBILE_SYNC_DEVICE_ID } from "../lib/phase10bSync";
 
 type DbLike = Awaited<ReturnType<typeof openMobileDatabase>>;
 
-const ALTERS = [
-  "ALTER TABLE sync_queue ADD COLUMN next_retry_at TEXT",
-  "ALTER TABLE sync_queue ADD COLUMN device_id TEXT",
-  "ALTER TABLE sync_queue ADD COLUMN queue_uuid TEXT",
+const SYNC_QUEUE_COLUMN_PATCHES: { column: string; ddl: string }[] = [
+  { column: "next_retry_at", ddl: "ALTER TABLE sync_queue ADD COLUMN next_retry_at TEXT" },
+  { column: "device_id", ddl: "ALTER TABLE sync_queue ADD COLUMN device_id TEXT" },
+  { column: "queue_uuid", ddl: "ALTER TABLE sync_queue ADD COLUMN queue_uuid TEXT" },
 ];
+
+async function tableHasColumn(database: DbLike, table: string, column: string): Promise<boolean> {
+  try {
+    const rows = await database.getAllAsync<{ name?: string }>(`PRAGMA table_info(${table})`);
+    return rows.some((row) => row.name === column);
+  } catch {
+    return false;
+  }
+}
+
+async function ensureSyncQueueColumns(database: DbLike) {
+  for (const patch of SYNC_QUEUE_COLUMN_PATCHES) {
+    if (await tableHasColumn(database, "sync_queue", patch.column)) continue;
+    try {
+      await database.execAsync(patch.ddl);
+    } catch {
+      /* ignore if race or already applied */
+    }
+  }
+}
 
 async function applySchema(database: DbLike) {
   // Full create-if-not-exists for current SCHEMA_VERSION tables
@@ -20,13 +40,7 @@ async function applySchema(database: DbLike) {
     await database.execAsync(stmt);
   }
 
-  for (const sql of ALTERS) {
-    try {
-      await database.runAsync(sql);
-    } catch {
-      /* column may already exist */
-    }
-  }
+  await ensureSyncQueueColumns(database);
 
   // Backfill device_id + queue_uuid; normalize legacy synced → done
   const now = new Date().toISOString();

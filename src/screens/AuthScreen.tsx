@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { StyleSheet, View } from "react-native";
 import { Text } from "react-native-paper";
@@ -18,6 +18,7 @@ type Props = {
 export function LoginScreen({ onSuccess, onLegacySubmit }: Props) {
   const { t } = useTranslation();
   const { login, loading, error } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
   const { control, handleSubmit, formState } = useForm<FormValues>({
     defaultValues: { email: "", password: "" },
   });
@@ -61,7 +62,15 @@ export function LoginScreen({ onSuccess, onLegacySubmit }: Props) {
         name="password"
         rules={{ required: true }}
         render={({ field: { onChange, value } }) => (
-          <Input testID="auth-password" label={t("password")} value={value} onChangeText={onChange} secureTextEntry />
+          <Input
+            testID="auth-password"
+            label={t("password")}
+            value={value}
+            onChangeText={onChange}
+            secureTextEntry={!showPassword}
+            rightIcon={showPassword ? "eye-off" : "eye"}
+            onRightIconPress={() => setShowPassword((v) => !v)}
+          />
         )}
       />
       {error || formState.errors.email ? (

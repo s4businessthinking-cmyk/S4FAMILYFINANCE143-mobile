@@ -1,6 +1,6 @@
 /** Offline SQLite schema — architecture Offline-First local mirrors + sync_queue. */
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** Architecture status enum: pending|syncing|done|failed|conflict (+ legacy synced/cancelled). */
 export type SyncQueueStatus =

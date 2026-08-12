@@ -1,12 +1,17 @@
 describe("S4 Family Finance smoke", () => {
   beforeAll(async () => {
-    await device.launchApp({ newInstance: true });
+    await device.launchApp({
+      newInstance: true,
+      delete: false,
+      launchArgs: { detoxEnableSynchronization: 0 },
+    });
+    await device.disableSynchronization();
   });
 
   it("shows the login surface", async () => {
     await waitFor(element(by.id("auth-screen")))
       .toBeVisible()
-      .withTimeout(15000);
+      .withTimeout(60000);
   });
 
   it("shows the login fields", async () => {
@@ -17,6 +22,6 @@ describe("S4 Family Finance smoke", () => {
   it("auth sign-in button is tappable", async () => {
     await waitFor(element(by.id("auth-sign-in")))
       .toBeVisible()
-      .withTimeout(10000);
+      .withTimeout(15000);
   });
 });

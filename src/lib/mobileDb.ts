@@ -7,7 +7,7 @@ import {
 } from "./mobileDbCrypto";
 
 /** Fresh plain DB for Expo Go — avoids corrupt file left by failed SQLCipher PRAGMA key. */
-export const EXPO_GO_DB_NAME = "s4_family_finance_mobile_go_v3.db";
+export const EXPO_GO_DB_NAME = "s4_family_finance_mobile_go_v4.db";
 
 let cachedDb: SQLite.SQLiteDatabase | null = null;
 let cachedDbName: string | null = null;
@@ -124,6 +124,11 @@ export async function openMobileDatabase(name: string = ENCRYPTED_DB_NAME) {
               note: "Key ready in SecureStore. Full SQLCipher needs custom native build (not Expo Go).",
             }
       );
+      if (cipherVersion) {
+        console.info(`[SQLCipher] runtime ON cipher_version=${cipherVersion} db=${dbName}`);
+      } else {
+        console.warn(`[SQLCipher] pending — cipher_version missing for db=${dbName}`);
+      }
 
       cachedDb = serializeDb(db);
       cachedDbName = dbName;

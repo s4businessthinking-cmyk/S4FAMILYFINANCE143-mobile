@@ -21,7 +21,7 @@ export type MobileTheme = "light" | "dark";
 const DICT: Record<string, Record<string, string>> = {
   bn: {
     appTitle: "মোবাইল ফাইন্যান্স ড্যাশবোর্ড",
-    appSubtitle: "সুরক্ষিত লগইন, SQLite অফলাইন কিউ, গ্রোসারি প্রিভিউ এবং লাইভ API সিঙ্ক।",
+    appSubtitle: "পরিবারের হিসাব — লগইন, পরিবার তৈরি, বা ইনভাইট দিয়ে যোগ দিন।",
     login: "লগইন",
     email: "ইমেইল",
     password: "পাসওয়ার্ড",
@@ -579,6 +579,10 @@ const DICT: Record<string, Record<string, string>> = {
     resetLinkSent: "রিসেট লিংক পাঠানো হয়েছে",
     show: "দেখুন",
     hide: "লুকান",
+    showAdvancedServer: "সার্ভার সেটিংস (উন্নত)",
+    hideAdvancedServer: "সার্ভার সেটিংস লুকান",
+    apiBaseHelpUsb: "USB ছাড়া: http://192.168.13.248:8000 লিখুন (ফোন ও PC একই Wi-Fi)। USB হলে adb reverse + http://127.0.0.1:8000।",
+    passwordRulesHint: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষর হতে হবে।",
     remember: "এই ডিভাইস মনে রাখুন",
     passwordStrength: "পাসওয়ার্ড শক্তি",
     revokeInvite: "ইনভাইট বাতিল",
@@ -626,7 +630,7 @@ const DICT: Record<string, Record<string, string>> = {
   },
   en: {
     appTitle: "Mobile Finance Dashboard",
-    appSubtitle: "Secure login, SQLite offline queue, grocery preview, and live API sync.",
+    appSubtitle: "Family accounts — sign in, create a family, or join with an invite.",
     login: "Login",
     email: "Email",
     password: "Password",
@@ -1185,6 +1189,10 @@ const DICT: Record<string, Record<string, string>> = {
     resetLinkSent: "Reset link sent",
     show: "Show",
     hide: "Hide",
+    showAdvancedServer: "Server settings (advanced)",
+    hideAdvancedServer: "Hide server settings",
+    apiBaseHelpUsb: "Without USB use http://192.168.13.248:8000 (phone + PC on same Wi-Fi). With USB: adb reverse + http://127.0.0.1:8000.",
+    passwordRulesHint: "Password must be at least 8 characters.",
     remember: "Remember this device",
     passwordStrength: "Password strength",
     revokeInvite: "Revoke invite",
@@ -1234,7 +1242,7 @@ const DICT: Record<string, Record<string, string>> = {
 
 const AR_OVERRIDES: Record<string, string> = {
   appTitle: "لوحة مالية للعائلة",
-  appSubtitle: "تسجيل آمن وطابور دون اتصال ومزامنة مباشرة.",
+  appSubtitle: "حسابات العائلة — سجّل الدخول أو أنشئ عائلة أو انضم بدعوة.",
   login: "تسجيل الدخول",
   email: "البريد الإلكتروني",
   password: "كلمة المرور",
@@ -1369,7 +1377,7 @@ const AR_OVERRIDES: Record<string, string> = {
 
 const HI_OVERRIDES: Record<string, string> = {
   appTitle: "मोबाइल वित्त डैशबोर्ड",
-  appSubtitle: "सुरक्षित लॉगिन, ऑफ़लाइन कतार और लाइव API सिंक।",
+  appSubtitle: "पारिवारिक खाते — साइन इन करें, परिवार बनाएँ, या आमंत्रण से जुड़ें।",
   login: "लॉगिन",
   email: "ईमेल",
   password: "पासवर्ड",
@@ -1504,7 +1512,7 @@ const HI_OVERRIDES: Record<string, string> = {
 
 const UR_OVERRIDES: Record<string, string> = {
   appTitle: "موبائل فنانس ڈیش بورڈ",
-  appSubtitle: "محفوظ لاگ ان، آف لائن قطار اور لائیو API سنک۔",
+  appSubtitle: "خاندانی حساب — سائن ان کریں، خاندان بنائیں، یا دعوت سے جڑیں۔",
   login: "لاگ ان",
   email: "ای میل",
   password: "پاس ورڈ",

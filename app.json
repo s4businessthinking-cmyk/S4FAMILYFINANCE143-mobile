@@ -62,7 +62,7 @@
     },
     "extra": {
       "router": {},
-      "apiBaseUrl": "http://127.0.0.1:8000",
+      "apiBaseUrl": "http://192.168.13.248:8000",
       "sentryDsn": "",
       "eas": {
         "projectId": "dfc31d5c-eddc-4d79-b540-05127584161c"

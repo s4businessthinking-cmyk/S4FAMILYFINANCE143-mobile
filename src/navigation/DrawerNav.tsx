@@ -1,7 +1,5 @@
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import React from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Text } from "react-native-paper";
 import { MainTabNavigator } from "./MainTab";
 import { GroceryHost, BudgetHost, LoansHost, SettingsHost, ExpenseHost } from "./screenHosts";
 import { colors } from "../theme/colors";
@@ -20,7 +18,7 @@ export type DrawerParamList = {
 
 const Drawer = createDrawerNavigator<DrawerParamList>();
 
-/** React Navigation drawer — MainTab + secondary screens. */
+/** React Navigation drawer — native/dev builds only (not Expo Go). */
 export function DrawerNavigator() {
   return (
     <Drawer.Navigator
@@ -40,43 +38,5 @@ export function DrawerNavigator() {
   );
 }
 
-type DrawerListProps = {
-  active?: string;
-  onNavigate: (route: string) => void;
-  labels?: Record<string, string>;
-};
-
-/** Compact drawer list (More / control center). */
-export function DrawerNav({ active, onNavigate, labels = {} }: DrawerListProps) {
-  const routes = ["grocery", "planner", "life", "family", "zakat", "alerts", "audit", "settings", "sync", "backup", "currency"];
-  return (
-    <View style={styles.wrap}>
-      {routes.map((route) => (
-        <Pressable
-          key={route}
-          style={[styles.item, active === route ? styles.active : null]}
-          onPress={() => onNavigate(route)}
-        >
-          <Text style={[styles.label, active === route ? styles.activeLabel : null]}>
-            {labels[route] || route}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  wrap: { gap: 4 },
-  item: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  active: { backgroundColor: "#e7f6f1", borderColor: colors.primary },
-  label: { color: colors.text, fontWeight: "600", textTransform: "capitalize" },
-  activeLabel: { color: colors.primaryDark },
-});
+/** @deprecated Use MobileMoreDrawerList in Expo Router / Expo Go. */
+export { MobileMoreDrawerList as DrawerNav } from "../components/MobileMoreDrawerList";

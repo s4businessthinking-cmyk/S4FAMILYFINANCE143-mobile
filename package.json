@@ -72,6 +72,7 @@
   },
   "scripts": {
     "start": "expo start",
+    "start:go": "powershell -ExecutionPolicy Bypass -File ./scripts/start-expo-go.ps1",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -83,6 +84,7 @@
     "test:jest": "jest --config jest.config.js",
     "test:e2e:build": "detox build -c android.emu.debug",
     "test:e2e": "detox test -c android.emu.debug",
+    "test:e2e:device": "detox test -c android.att.debug",
     "prebuild:native": "expo prebuild --clean",
     "android:native": "expo run:android",
     "android:apk": "powershell -ExecutionPolicy Bypass -File ./scripts/build-android-apk.ps1",
