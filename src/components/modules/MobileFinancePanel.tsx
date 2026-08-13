@@ -260,9 +260,23 @@ export function MobileFinancePanel({
       ]);
       const accountRows = Array.isArray(acc) ? acc : [];
       const categoryRows = Array.isArray(cats) ? cats : [];
-      setAccounts(accountRows);
+      let mergedAccounts = accountRows;
+      let mergedTransactions = Array.isArray(txs) ? txs : [];
+      try {
+        const { listLocal } = await import("../../database/localRepository");
+        const { mergeApiAccounts, mergeApiTransactions } = await import("../../lib/mergeLocalFinance");
+        const [localAcc, localTx] = await Promise.all([
+          listLocal("accounts", familyId, 100),
+          listLocal("transactions", familyId, 100),
+        ]);
+        mergedAccounts = mergeApiAccounts(accountRows, (localAcc || []) as Record<string, unknown>[]);
+        mergedTransactions = mergeApiTransactions(mergedTransactions, (localTx || []) as Record<string, unknown>[]);
+      } catch {
+        /* local merge optional */
+      }
+      setAccounts(mergedAccounts);
       setCategories(categoryRows);
-      setTransactions(Array.isArray(txs) ? txs : []);
+      setTransactions(mergedTransactions);
       setBudgets(Array.isArray(buds) ? buds : []);
       setSavings(Array.isArray(sav) ? sav : []);
       setLoans(Array.isArray(lon) ? lon : []);
@@ -302,7 +316,7 @@ export function MobileFinancePanel({
           categoryRows.find((c: Category) => c.category_type === current.transaction_type)?.id ||
           "",
       }));
-      onMessage(tm("financeLoaded").replace("{n}", String(accountRows.length)), true);
+      onMessage(tm("financeLoaded").replace("{n}", String(mergedAccounts.length)), true);
     } catch (error) {
       try {
         const { listLocal } = await import("../../database/localRepository");
@@ -396,6 +410,20 @@ export function MobileFinancePanel({
     };
     const online = typeof navigator === "undefined" ? true : navigator.onLine !== false;
     try {
+      if (online && token && familyId) {
+        try {
+          await apiPost("/api/v1/accounts", payload, token);
+          setWalletForm({ name: "", account_type: walletForm.account_type, opening_balance: "0" });
+          await afterWrite(tm("walletCreated"));
+          setLoading(false);
+          return;
+        } catch (apiError) {
+          const apiMsg = apiError instanceof Error ? apiError.message : "";
+          if (!onQueueOffline || !/failed to fetch|network|offline|connect/i.test(apiMsg)) {
+            throw apiError;
+          }
+        }
+      }
       if (onQueueOffline) {
         await onQueueOffline("accounts", "CREATE", payload);
                 const _online = typeof navigator === "undefined" ? true : navigator.onLine !== false;

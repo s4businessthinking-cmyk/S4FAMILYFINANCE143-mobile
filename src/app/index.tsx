@@ -306,6 +306,7 @@ export default function HomeScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [familySetupMode, setFamilySetupMode] = useState<"create" | "join">("create");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [familyName, setFamilyName] = useState("");
@@ -991,6 +992,90 @@ export default function HomeScreen() {
     }
   }
 
+  async function createFamilyForSession() {
+    if (!familyName.trim()) {
+      setMessage(tm("authFieldsRequired"));
+      setStatus("failed");
+      Alert.alert(tm("authCreate"), tm("familyName") + " required");
+      return;
+    }
+    if (!token) {
+      await createFamilyAuth();
+      return;
+    }
+    setLoading(true);
+    try {
+      const created = await apiPost(
+        "/api/v1/families",
+        {
+          name: familyName.trim(),
+          default_currency: familyCurrency.trim() || "BDT",
+          timezone: familyTimezone.trim() || "Asia/Dhaka",
+          relationship_type: ownerRelation,
+        },
+        token
+      );
+      const createdFamilyId =
+        created?.family_id || created?.family?.id || created?.id || "";
+      if (createdFamilyId) setActiveFamilyId(String(createdFamilyId));
+      setStatus("ok");
+      setMessage(tm("familyCreatedOk"));
+      await refreshAll(token);
+    } catch (error) {
+      setStatus("failed");
+      const text = error instanceof Error ? error.message : "Family create failed";
+      setMessage(text);
+      Alert.alert(tm("authCreate"), text);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function joinFamilyForSession() {
+    if (!inviteCode.trim()) {
+      setMessage(tm("authFieldsRequired"));
+      setStatus("failed");
+      return;
+    }
+    if (needsRelationshipNote(joinRelation) && !joinNote.trim()) {
+      setMessage(tm("relationshipNoteRequired") || "Relationship note required");
+      setStatus("failed");
+      return;
+    }
+    if (needsLinkedMember(joinRelation) && !joinLinkedMemberId.trim()) {
+      setMessage(tm("linkedMemberRequired") || "Linked member id required");
+      setStatus("failed");
+      return;
+    }
+    if (!token) {
+      await joinFamilyAuth();
+      return;
+    }
+    setLoading(true);
+    try {
+      await apiPost(
+        "/api/v1/invites/join",
+        buildJoinInvitePayload({
+          invite_code: inviteCode.trim().toUpperCase(),
+          relationship_type: joinRelation,
+          relationship_serial: joinSerial,
+          serial_label: joinSerialLabel,
+          linked_member_id: joinLinkedMemberId,
+          relationship_note: joinNote,
+        }),
+        token
+      );
+      setStatus("ok");
+      setMessage(tm("joinRequestedOk"));
+      await refreshAll(token);
+    } catch (error) {
+      setStatus("failed");
+      setMessage(error instanceof Error ? error.message : "Join failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function joinFamilyAuth() {
     if (!email.trim() || !password || !inviteCode.trim()) {
       setMessage(tm("authFieldsRequired"));
@@ -1093,11 +1178,24 @@ export default function HomeScreen() {
           savings_current: dashboardData.savings?.total_current_amount,
         };
         setDashboard(dash);
-        const accountRows = await apiGet(`/api/v1/accounts/family/${familyId}`, authToken);
+        const accountRowsRaw = await apiGet(`/api/v1/accounts/family/${familyId}`, authToken);
+        let accountRows = Array.isArray(accountRowsRaw) ? accountRowsRaw : [];
+        const txRaw = await apiGet(`/api/v1/transactions/${familyId}`, authToken);
+        let txRows = Array.isArray(txRaw) ? txRaw : txRaw?.transactions || [];
+        try {
+          const { listLocal } = await import("../database/localRepository");
+          const { mergeApiAccounts, mergeApiTransactions } = await import("../lib/mergeLocalFinance");
+          const [localAcc, localTx] = await Promise.all([
+            listLocal("accounts", familyId, 100),
+            listLocal("transactions", familyId, 100),
+          ]);
+          accountRows = mergeApiAccounts(accountRows, (localAcc || []) as Record<string, unknown>[]);
+          txRows = mergeApiTransactions(txRows, (localTx || []) as Record<string, unknown>[]);
+        } catch {
+          /* local merge optional */
+        }
         setAccounts(accountRows);
         setCategories(await apiGet(`/api/v1/categories/family/${familyId}`, authToken));
-        const txRaw = await apiGet(`/api/v1/transactions/${familyId}`, authToken);
-        const txRows = Array.isArray(txRaw) ? txRaw : txRaw?.transactions || [];
         setTransactions(txRows);
         const budgetRaw = await apiGet(`/api/v1/budgets/${familyId}`, authToken);
         const budgetRows = Array.isArray(budgetRaw) ? budgetRaw : budgetRaw?.budgets || [];
@@ -1736,18 +1834,18 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.topActions}>
                     <Pressable style={[styles.iconBtn, dark ? styles.iconBtnDark : null]} onPress={() => changeAppTheme(dark ? "light" : "dark")}>
-                      <Text>{dark ? "?" : "?"}</Text>
+                      <Text style={[styles.iconBtnText, dark ? styles.textOnDark : null]}>{dark ? "☀" : "☾"}</Text>
                     </Pressable>
                     <Pressable style={[styles.iconBtn, dark ? styles.iconBtnDark : null]} onPress={() => setMobileTab("alerts")}>
-                      <Text>??</Text>
+                      <Text style={[styles.iconBtnText, dark ? styles.textOnDark : null]}>🔔</Text>
                     </Pressable>
                     <Pressable style={[styles.iconBtn, dark ? styles.iconBtnDark : null]} onPress={logout}>
-                      <Text style={[styles.iconBtnText, dark ? styles.textOnDark : null]}>?</Text>
+                      <Text style={[styles.iconBtnText, dark ? styles.textOnDark : null]}>⎋</Text>
                     </Pressable>
                   </View>
                 </View>
                 <View style={[styles.searchShell, dark ? styles.inputDark : null]}>
-                  <Text style={styles.searchIcon}>?</Text>
+                  <Text style={styles.searchIcon}>⌕</Text>
                   <TextInput
                     style={[styles.searchInput, dark ? styles.textOnDark : null]}
                     placeholder="Search modules, transactions..."
@@ -1757,6 +1855,60 @@ export default function HomeScreen() {
                   />
                 </View>
               </View>
+
+              {token && !activeFamilyId ? (
+                <View style={[styles.panel, dark ? styles.panelDark : null]}>
+                  <Text style={[styles.sectionLabel, dark ? styles.textOnDark : null]}>
+                    Family setup required
+                  </Text>
+                  <Text style={[styles.muted, dark ? styles.mutedOnDark : null]}>
+                    Wallet ও data add করতে আগে family তৈরি করুন বা invite দিয়ে join করুন। PC server চালু + USB/Wi-Fi connected থাকতে হবে।
+                  </Text>
+                  <View style={styles.statusRow}>
+                    <Pressable onPress={() => setFamilySetupMode("create")}>
+                      <Text style={[styles.statusPill, familySetupMode === "create" ? styles.ok : null]}>{tm("authCreate")}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setFamilySetupMode("join")}>
+                      <Text style={[styles.statusPill, familySetupMode === "join" ? styles.ok : null]}>{tm("authJoin")}</Text>
+                    </Pressable>
+                  </View>
+                  {familySetupMode === "create" ? (
+                    <>
+                      <TextInput
+                        style={[styles.input, dark ? styles.inputDark : null]}
+                        placeholder={tm("familyName")}
+                        placeholderTextColor="#8aa39a"
+                        value={familyName}
+                        onChangeText={setFamilyName}
+                      />
+                      <View style={styles.statusRow}>
+                        {["BDT", "AED", "USD", "SAR"].map((code) => (
+                          <Pressable key={code} onPress={() => setFamilyCurrency(code)}>
+                            <Text style={[styles.statusPill, familyCurrency === code ? styles.ok : null]}>{code}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <Pressable style={styles.primaryButton} onPress={createFamilyForSession} disabled={loading}>
+                        <Text style={styles.primaryButtonText}>{loading ? tm("signingIn") : tm("createFamilySubmit")}</Text>
+                      </Pressable>
+                    </>
+                  ) : (
+                    <>
+                      <TextInput
+                        style={[styles.input, dark ? styles.inputDark : null]}
+                        placeholder={tm("inviteCode")}
+                        placeholderTextColor="#8aa39a"
+                        autoCapitalize="characters"
+                        value={inviteCode}
+                        onChangeText={setInviteCode}
+                      />
+                      <Pressable style={styles.primaryButton} onPress={joinFamilyForSession} disabled={loading}>
+                        <Text style={styles.primaryButtonText}>{loading ? tm("signingIn") : tm("joinFamilySubmit")}</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
+              ) : null}
 
               {mobileTab === "home" ? (
                 <DashboardScreen
@@ -1920,6 +2072,18 @@ export default function HomeScreen() {
               <Text style={styles.secondaryButtonText}>{tm("clearConflicts")}</Text>
             </Pressable>
           </View>
+          ) : null}
+
+          {token && mobileTab === "finance" && !activeFamilyId ? (
+            <View style={[styles.panel, dark ? styles.panelDark : null]}>
+              <Text style={[styles.sectionLabel, dark ? styles.textOnDark : null]}>Family setup required</Text>
+              <Text style={[styles.muted, dark ? styles.mutedOnDark : null]}>
+                Home tab-এ গিয়ে family তৈরি করুন, তারপর wallet add করতে পারবেন।
+              </Text>
+              <Pressable style={styles.primaryButton} onPress={() => setMobileTab("home")}>
+                <Text style={styles.primaryButtonText}>Go to Home</Text>
+              </Pressable>
+            </View>
           ) : null}
 
           {token && mobileTab === "finance" && activeFamilyId ? (
@@ -2450,20 +2614,20 @@ export default function HomeScreen() {
               <View style={styles.moreGrid}>
                 {(
                   [
-                    { kind: "finance" as const, sub: "WALLETS" as FinanceSub, labelKey: "wallets", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "finance" as const, sub: "TX" as FinanceSub, labelKey: "tx", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "finance" as const, sub: "BUDGET" as FinanceSub, labelKey: "budgets", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "finance" as const, sub: "SAVINGS" as FinanceSub, labelKey: "savings", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "finance" as const, sub: "LOANS" as FinanceSub, labelKey: "loans", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "finance" as const, sub: "GOALS" as FinanceSub, labelKey: "goals", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "finance" as const, sub: "RECURRING" as FinanceSub, labelKey: "recurring", hintKey: "modHint_finance", icon: "?" },
-                    { kind: "life" as const, moduleType: "HEALTH", labelKey: "enum_HEALTH", hintKey: "modHint_life", icon: "?" },
-                    { kind: "life" as const, moduleType: "VEHICLE", labelKey: "enum_VEHICLE", hintKey: "modHint_life", icon: "??" },
-                    { kind: "life" as const, moduleType: "EDUCATION", labelKey: "enum_EDUCATION", hintKey: "modHint_life", icon: "??" },
-                    { kind: "life" as const, moduleType: "INVESTMENT", labelKey: "investments", hintKey: "modHint_life", icon: "??" },
-                    { kind: "life" as const, moduleType: "SUBSCRIPTION", labelKey: "enum_SUBSCRIPTION", hintKey: "modHint_life", icon: "??" },
-                    { kind: "life" as const, moduleType: "DOCUMENT", labelKey: "enum_DOCUMENT", hintKey: "modHint_life", icon: "??" },
-                    { kind: "life" as const, moduleType: "PROPERTY", labelKey: "enum_PROPERTY", hintKey: "modHint_life", icon: "??" },
+                    { kind: "finance" as const, sub: "WALLETS" as FinanceSub, labelKey: "wallets", hintKey: "modHint_finance", icon: "◇" },
+                    { kind: "finance" as const, sub: "TX" as FinanceSub, labelKey: "tx", hintKey: "modHint_finance", icon: "↕" },
+                    { kind: "finance" as const, sub: "BUDGET" as FinanceSub, labelKey: "budgets", hintKey: "modHint_finance", icon: "◷" },
+                    { kind: "finance" as const, sub: "SAVINGS" as FinanceSub, labelKey: "savings", hintKey: "modHint_finance", icon: "◎" },
+                    { kind: "finance" as const, sub: "LOANS" as FinanceSub, labelKey: "loans", hintKey: "modHint_finance", icon: "⇄" },
+                    { kind: "finance" as const, sub: "GOALS" as FinanceSub, labelKey: "goals", hintKey: "modHint_finance", icon: "★" },
+                    { kind: "finance" as const, sub: "RECURRING" as FinanceSub, labelKey: "recurring", hintKey: "modHint_finance", icon: "↻" },
+                    { kind: "life" as const, moduleType: "HEALTH", labelKey: "enum_HEALTH", hintKey: "modHint_life", icon: "❤" },
+                    { kind: "life" as const, moduleType: "VEHICLE", labelKey: "enum_VEHICLE", hintKey: "modHint_life", icon: "🚗" },
+                    { kind: "life" as const, moduleType: "EDUCATION", labelKey: "enum_EDUCATION", hintKey: "modHint_life", icon: "📚" },
+                    { kind: "life" as const, moduleType: "INVESTMENT", labelKey: "investments", hintKey: "modHint_life", icon: "◈" },
+                    { kind: "life" as const, moduleType: "SUBSCRIPTION", labelKey: "enum_SUBSCRIPTION", hintKey: "modHint_life", icon: "🔁" },
+                    { kind: "life" as const, moduleType: "DOCUMENT", labelKey: "enum_DOCUMENT", hintKey: "modHint_life", icon: "📄" },
+                    { kind: "life" as const, moduleType: "PROPERTY", labelKey: "enum_PROPERTY", hintKey: "modHint_life", icon: "🏠" },
                   ]
                 ).map((item) => (
                   <Pressable
