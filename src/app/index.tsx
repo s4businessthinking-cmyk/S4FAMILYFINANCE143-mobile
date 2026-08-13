@@ -97,11 +97,17 @@ import {
 } from "../lib/phase10bSync";
 import { flushMobileDocumentUploads } from "../lib/offlineFileQueue";
 import { loadModuleSnapshot, saveModuleSnapshot } from "../lib/offlineSnapshots";
+import {
+  createOfflineAccount,
+  isOfflineAccessToken,
+  loadOfflineFamily,
+  probeApiHealth,
+} from "../database/offlineAuth";
 
 function normalizeApiBaseUrl(value: string) {
   const cleaned = value.trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(cleaned)) return cleaned;
-  return cleaned.replace(/\/api\/v1$/i, "");
+  return cleaned.replace(/\/api\/v[12]$/i, "");
 }
 
 const DEFAULT_API_BASE_URL = normalizeApiBaseUrl(
@@ -158,6 +164,7 @@ type StoredSession = {
   refresh_token?: string;
   email: string;
   family_id?: string;
+  offline_mode?: boolean;
   user?: { id?: string; email?: string; full_name?: string; name?: string };
 };
 
@@ -674,6 +681,12 @@ export default function HomeScreen() {
       if (!isAutomatic) Alert.alert("Offline Sync", "Login required before replaying offline actions.");
       return;
     }
+    if (isOfflineAccessToken(token)) {
+      if (!isAutomatic) {
+        Alert.alert("Offline mode", "Offline account-এ server sync নেই। Data phone SQLite-এই আছে.");
+      }
+      return;
+    }
 
     if (!isAutomatic) setLoading(true);
     let serverConflictCount = 0;
@@ -807,10 +820,15 @@ export default function HomeScreen() {
           if (cached.groceryLists) setGroceryLists(cached.groceryLists);
           if (cached.groceryItems) setGroceryItems(cached.groceryItems);
           setStatus("ok");
-          setMessage("Offline cache ready. Syncing�");
+          setMessage("Offline cache ready. Syncing…");
         }
       }
       setStatus("ok");
+      if (isOfflineAccessToken(session.access_token) || session.offline_mode) {
+        setMessage("Offline session restored.");
+        await refreshAll(session.access_token);
+        return;
+      }
       if (!session.family_id) setMessage("Session restored from secure storage.");
       await refreshAll(session.access_token);
     } catch {
@@ -849,9 +867,17 @@ export default function HomeScreen() {
     return svcDelete(path, authToken || null);
   }
 
-  async function persistSession(accessToken: string, nextRefreshToken: string, user?: any, emailOverride?: string) {
+  async function persistSession(
+    accessToken: string,
+    nextRefreshToken: string,
+    user?: any,
+    emailOverride?: string,
+    familyId?: string,
+    offlineMode?: boolean
+  ) {
     setToken(accessToken);
     setRefreshToken(nextRefreshToken || "");
+    if (familyId) setActiveFamilyId(familyId);
     try {
       if (await SecureStore.isAvailableAsync()) {
         await SecureStore.setItemAsync(
@@ -861,11 +887,86 @@ export default function HomeScreen() {
             refresh_token: nextRefreshToken,
             email: (emailOverride ?? email).trim(),
             user,
-          })
+            family_id: familyId || undefined,
+            offline_mode: Boolean(offlineMode || isOfflineAccessToken(accessToken)),
+          } satisfies StoredSession)
         );
       }
     } catch {
       // Web preview may not support SecureStore; keep session in memory.
+    }
+  }
+
+  async function createOfflineAccountAuth() {
+    const name = fullName.trim() || "Guardian";
+    const fam = familyName.trim() || `${name} Family`;
+    const mail = email.trim() || `offline-${Date.now()}@local.s4`;
+    const pass = password || "offline";
+    setLoading(true);
+    try {
+      await setupLocalDatabase();
+      const created = await createOfflineAccount({
+        fullName: name,
+        email: mail,
+        password: pass,
+        familyName: fam,
+        currency: familyCurrency.trim() || "BDT",
+        timezone: familyTimezone.trim() || "Asia/Dhaka",
+      });
+      setEmail(mail);
+      setFamilies([
+        {
+          id: created.family.id,
+          name: created.family.name,
+          default_currency: created.family.default_currency,
+          timezone: created.family.timezone,
+        },
+      ]);
+      setActiveFamilyId(created.family.id);
+      await persistSession(
+        created.access_token,
+        created.refresh_token,
+        created.user,
+        mail,
+        created.family.id,
+        true
+      );
+      setStatus("ok");
+      setMessage("Offline account ready. Server লাগে না — data phone-এ থাকবে.");
+      await refreshAll(created.access_token);
+      Alert.alert(
+        "Offline mode",
+        "Account + family তৈরি হয়েছে। Wallet/data add করতে পারবেন। Online sync হবে না যতক্ষণ server account না বানান।"
+      );
+    } catch (error) {
+      setStatus("failed");
+      const text = error instanceof Error ? error.message : "Offline create failed";
+      setMessage(text);
+      Alert.alert("Offline create", text);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function testApiConnection() {
+    setLoading(true);
+    try {
+      const url = await persistApiBaseUrl(apiBaseUrlInput);
+      const probe = await probeApiHealth(url, 5000);
+      if (probe.ok) {
+        setStatus("ok");
+        setMessage(`API OK: ${url}`);
+        Alert.alert("Wi-Fi API", `Connected: ${url}`);
+      } else {
+        setStatus("failed");
+        setMessage(`API fail: ${url} — ${probe.detail}`);
+        Alert.alert(
+          "Network Error",
+          `ফোন API পাচ্ছে না.\n\nURL: ${url}\nError: ${probe.detail}\n\nSame Wi-Fi check করুন, Windows Firewall-এ port 8000 allow করুন, অথবা Offline account ব্যবহার করুন.`
+        );
+      }
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -955,7 +1056,21 @@ export default function HomeScreen() {
     }
     setLoading(true);
     try {
-      await persistApiBaseUrl(apiBaseUrlInput);
+      const url = await persistApiBaseUrl(apiBaseUrlInput);
+      const probe = await probeApiHealth(url, 5000);
+      if (!probe.ok) {
+        setStatus("failed");
+        setMessage(`Network Error: ${url}`);
+        Alert.alert(
+          "Network Error",
+          `Server পাওয়া যাচ্ছে না.\n\nURL: ${url}\n${probe.detail}\n\nSame Wi-Fi + Firewall 8000 check করুন।\nঅথবা Offline account তৈরি করুন (server লাগে না).`,
+          [
+            { text: "Offline create", onPress: () => void createOfflineAccountAuth() },
+            { text: "OK" },
+          ]
+        );
+        return;
+      }
       const session = await ensureAuthSession();
       if (!session.access) throw new Error("No access token");
       const created = await apiPost(
@@ -972,7 +1087,7 @@ export default function HomeScreen() {
         created?.family_id || created?.family?.id || created?.id || "";
       setStatus("ok");
       setMessage(tm("familyCreatedOk"));
-      await persistSession(session.access, session.refresh, session.user);
+      await persistSession(session.access, session.refresh, session.user, email.trim(), createdFamilyId || undefined, false);
       if (createdFamilyId) setActiveFamilyId(String(createdFamilyId));
       try {
         await refreshAll(session.access);
@@ -1163,6 +1278,76 @@ export default function HomeScreen() {
     if (!authToken) return;
     setLoading(true);
     try {
+      if (isOfflineAccessToken(authToken)) {
+        const offlineFamily = await loadOfflineFamily();
+        const familyId = activeFamilyId || offlineFamily?.id || "";
+        if (offlineFamily) {
+          setFamilies([
+            {
+              id: offlineFamily.id,
+              name: offlineFamily.name,
+              default_currency: offlineFamily.default_currency,
+              timezone: offlineFamily.timezone,
+            },
+          ]);
+        }
+        setActiveFamilyId(familyId);
+        if (familyId) {
+          const { listLocal } = await import("../database/localRepository");
+          const [localAcc, localTx, localBud, localCat] = await Promise.all([
+            listLocal("accounts", familyId, 100),
+            listLocal("transactions", familyId, 100),
+            listLocal("budgets", familyId, 100),
+            listLocal("categories", familyId, 100),
+          ]);
+          const accountRows = (localAcc || []).map((row: any) => ({
+            id: String(row.server_id || row.id),
+            name: String(row.name || "Wallet"),
+            account_type: String(row.account_type || "CASH"),
+            currency: String(row.currency || offlineFamily?.default_currency || "BDT"),
+            current_balance: String(row.current_balance ?? row.opening_balance ?? "0"),
+          }));
+          const txRows = (localTx || []).map((row: any) => ({
+            id: String(row.server_id || row.id),
+            transaction_type: String(row.transaction_type || "EXPENSE"),
+            amount: String(row.amount || "0"),
+            currency: String(row.currency || "BDT"),
+            description: row.description ? String(row.description) : undefined,
+            created_at: row.created_at ? String(row.created_at) : undefined,
+          }));
+          setAccounts(accountRows);
+          setTransactions(txRows);
+          setBudgets((localBud || []) as Budget[]);
+          setCategories(
+            (localCat || []).map((row: any) => ({
+              id: String(row.server_id || row.id),
+              name_en: String(row.name_en || row.name || "Category"),
+              name_bn: row.name_bn ? String(row.name_bn) : undefined,
+              category_type: String(row.category_type || "EXPENSE"),
+            }))
+          );
+          const bal = accountRows.reduce((sum, a) => sum + (Number(a.current_balance) || 0), 0);
+          setDashboard({
+            total_wallet_balance: String(bal),
+            wallet_count: accountRows.length,
+            total_income: "0",
+            total_expense: "0",
+            net_income_expense: "0",
+          });
+          await saveModuleSnapshot(familyId, "home:finance", {
+            dashboard: {
+              total_wallet_balance: String(bal),
+              wallet_count: accountRows.length,
+            },
+            accounts: accountRows,
+            transactions: txRows,
+            budgets: localBud || [],
+          }).catch(() => undefined);
+        }
+        setStatus("ok");
+        setMessage("Offline mode — data from phone SQLite.");
+        return;
+      }
       const familyResponse = await apiGet("/api/v1/families", authToken);
       const list: Family[] = Array.isArray(familyResponse) ? familyResponse : familyResponse.families || [];
       setFamilies(list);
@@ -1803,10 +1988,27 @@ export default function HomeScreen() {
                   onChangeText={setApiBaseUrlInput}
                 />
                 <Text style={[styles.muted, dark ? styles.mutedOnDark : null]}>{tm("apiBaseHelpUsb")}</Text>
+                <Pressable style={styles.secondaryButton} onPress={testApiConnection} disabled={loading}>
+                  <Text style={styles.secondaryButtonText}>{loading ? "…" : "Test Wi-Fi API"}</Text>
+                </Pressable>
 
                 {authMode === "create" ? (
-                  <Pressable style={styles.primaryButton} onPress={createFamilyAuth} disabled={loading}>
-                    <Text style={styles.primaryButtonText}>{loading ? tm("signingIn") : tm("createFamilySubmit")}</Text>
+                  <>
+                    <Pressable style={styles.primaryButton} onPress={createFamilyAuth} disabled={loading}>
+                      <Text style={styles.primaryButtonText}>{loading ? tm("signingIn") : tm("createFamilySubmit")}</Text>
+                    </Pressable>
+                    <Pressable style={styles.secondaryButton} onPress={createOfflineAccountAuth} disabled={loading}>
+                      <Text style={styles.secondaryButtonText}>
+                        {loading ? "…" : "Offline account (server লাগে না)"}
+                      </Text>
+                    </Pressable>
+                  </>
+                ) : null}
+                {authMode === "login" ? (
+                  <Pressable style={styles.secondaryButton} onPress={createOfflineAccountAuth} disabled={loading}>
+                    <Text style={styles.secondaryButtonText}>
+                      {loading ? "…" : "Offline ব্যবহার করুন (server ছাড়া)"}
+                    </Text>
                   </Pressable>
                 ) : null}
                 {authMode === "join" ? (
@@ -1829,7 +2031,9 @@ export default function HomeScreen() {
                     <View style={styles.mobileBrandMark}><Text style={styles.mobileBrandMarkText}>S4</Text></View>
                     <View style={styles.flexMin}>
                       <Text style={[styles.mobileBrandTitle, dark ? styles.textOnDark : null]}>S4 FAMILY 143</Text>
-                      <Text style={styles.mobileBrandSub}>{tm("offlineReady")}</Text>
+                      <Text style={styles.mobileBrandSub}>
+                        {isOfflineAccessToken(token) ? "Offline Only" : tm("offlineReady")}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.topActions}>

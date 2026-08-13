@@ -246,6 +246,55 @@ export function MobileFinancePanel({
   const load = useCallback(async () => {
     if (!token || !familyId || sub === "OFFLINE") return;
     setLoading(true);
+    if (String(token).startsWith("offline.")) {
+      try {
+        const { listLocal } = await import("../../database/localRepository");
+        const [localAcc, localTx, localBud, localLoan, localCat] = await Promise.all([
+          listLocal("accounts", familyId, 100),
+          listLocal("transactions", familyId, 100),
+          listLocal("budgets", familyId, 100),
+          listLocal("loans", familyId, 100),
+          listLocal("categories", familyId, 100),
+        ]);
+        setAccounts(
+          (localAcc || []).map((row: any) => ({
+            id: String(row.server_id || row.id),
+            name: String(row.name || "Wallet"),
+            account_type: row.account_type,
+            currency: row.currency,
+            current_balance: row.current_balance ?? row.opening_balance ?? "0",
+          }))
+        );
+        setTransactions(
+          (localTx || []).map((row: any) => ({
+            id: String(row.server_id || row.id),
+            transaction_type: row.transaction_type,
+            amount: row.amount,
+            currency: row.currency,
+            description: row.description,
+            status: row.status,
+            account_id: row.account_id,
+            category_id: row.category_id,
+          }))
+        );
+        setBudgets(localBud || []);
+        setLoans(localLoan || []);
+        setCategories(
+          (localCat || []).map((row: any) => ({
+            id: String(row.server_id || row.id),
+            name_en: String(row.name_en || row.name || "Category"),
+            name_bn: row.name_bn,
+            category_type: String(row.category_type || "EXPENSE"),
+          }))
+        );
+        onMessage("Offline finance data loaded", true);
+      } catch (error) {
+        onMessage(error instanceof Error ? error.message : tm("financeLoadFailed"), false);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     try {
       const [acc, cats, txs, buds, sav, lon, gol, rec, tagRows] = await Promise.all([
         apiGet(`/api/v1/accounts/family/${familyId}`, token),
@@ -410,7 +459,7 @@ export function MobileFinancePanel({
     };
     const online = typeof navigator === "undefined" ? true : navigator.onLine !== false;
     try {
-      if (online && token && familyId) {
+      if (online && token && familyId && !String(token).startsWith("offline.")) {
         try {
           await apiPost("/api/v1/accounts", payload, token);
           setWalletForm({ name: "", account_type: walletForm.account_type, opening_balance: "0" });
@@ -426,15 +475,16 @@ export function MobileFinancePanel({
       }
       if (onQueueOffline) {
         await onQueueOffline("accounts", "CREATE", payload);
-                const _online = typeof navigator === "undefined" ? true : navigator.onLine !== false;
-                if (_online && token) {
-                  try {
-                    const { syncManager } = await import("../../sync/syncManager");
-                    await syncManager.replayPending(token, familyId, 20);
-                  } catch { /* stay queued */ }
-                }
+        const isOfflineTok = String(token || "").startsWith("offline.");
+        const _online = typeof navigator === "undefined" ? true : navigator.onLine !== false;
+        if (_online && token && !isOfflineTok) {
+          try {
+            const { syncManager } = await import("../../sync/syncManager");
+            await syncManager.replayPending(token, familyId, 20);
+          } catch { /* stay queued */ }
+        }
         setWalletForm({ name: "", account_type: walletForm.account_type, opening_balance: "0" });
-        onMessage("Wallet queued offline", true);
+        onMessage(isOfflineTok ? "Wallet saved offline" : "Wallet queued offline", true);
         await load();
         onChanged?.();
         setLoading(false);
