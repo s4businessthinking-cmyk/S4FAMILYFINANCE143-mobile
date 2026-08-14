@@ -33,6 +33,7 @@ import { useFamilyStore } from "../store/familyStore";
 import { runMigrations } from "../database/migrations";
 import { formatAmount as formatTakaAmount } from "../utils/formatTaka";
 import { openMobileDatabase, ENCRYPTED_DB_NAME, getOfflineDbSecurityStatus } from "../lib/mobileDb";
+import { fastStorage } from "../lib/fastStorage";
 import * as TaskManager from "expo-task-manager";
 import {
   Alert,
@@ -122,6 +123,8 @@ const LOCAL_DB_NAME = ENCRYPTED_DB_NAME;
 const AUTO_SYNC_INTERVAL_MS = 45000;
 const BACKGROUND_SYNC_TASK = "s4-family-finance-background-sync";
 const BACKGROUND_SYNC_INTERVAL_MINUTES = 15;
+/** User controls refresh — auto-sync stays off unless they turn it on. */
+const AUTO_SYNC_PREF_KEY = "s4_auto_sync_enabled";
 const MAX_SYNC_RETRIES = 5;
 
 /** Exponential backoff: 2s ? 4s ? 8s ? 16s ? 32s (cap 60s). */
@@ -405,7 +408,7 @@ export default function HomeScreen() {
   const [conflictRows, setConflictRows] = useState<SyncQueueRow[]>([]);
   const [serverConflicts, setServerConflicts] = useState<any[]>([]);
   const [serverConflictBusyId, setServerConflictBusyId] = useState("");
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
   const [backgroundSyncRegistered, setBackgroundSyncRegistered] = useState(false);
   const [backgroundSyncStatus, setBackgroundSyncStatus] = useState("unknown");
   const [lastAutoSyncAt, setLastAutoSyncAt] = useState("");
@@ -743,12 +746,18 @@ export default function HomeScreen() {
       }
 
       await refreshPendingCounts();
-      if (result.processed > 0) await refreshAll();
+      // Manual sync may refresh UI; automatic must not — it was locking buttons via setLoading.
+      if (result.processed > 0 && !isAutomatic) await refreshAll();
       if (isAutomatic) setLastAutoSyncAt(new Date().toISOString());
       void syncHook.refreshStatus();
     } finally {
       if (!isAutomatic) setLoading(false);
     }
+  }
+
+  function setAutoSyncPreference(enabled: boolean) {
+    setAutoSyncEnabled(enabled);
+    fastStorage.set(AUTO_SYNC_PREF_KEY, enabled ? "1" : "0");
   }
 
   async function restoreApiBaseUrl() {
@@ -1635,6 +1644,9 @@ export default function HomeScreen() {
     Promise.resolve().then(async () => {
       setAppLang(await loadMobileLanguage());
       setAppTheme(await loadMobileTheme());
+      const saved = fastStorage.getString(AUTO_SYNC_PREF_KEY);
+      // Default OFF — only "1" turns auto-sync on.
+      setAutoSyncEnabled(saved === "1");
       await restoreApiBaseUrl();
       await loadRememberedEmail();
       // DB must be ready before session/sync touches SQLite (Redmi NPE / missing tables).
@@ -2252,8 +2264,13 @@ export default function HomeScreen() {
                 </View>
               );
             })}
-            <Pressable style={styles.secondaryButton} onPress={() => setAutoSyncEnabled((current) => !current)}>
-              <Text style={styles.secondaryButtonText}>{autoSyncEnabled ? "Pause Auto-Sync" : "Resume Auto-Sync"}</Text>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => setAutoSyncPreference(!autoSyncEnabled)}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {autoSyncEnabled ? "Pause Auto-Sync" : "Resume Auto-Sync"}
+              </Text>
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={backgroundSyncRegistered ? unregisterBackgroundSync : registerBackgroundSync} disabled={!token || loading}>
               <Text style={styles.secondaryButtonText}>{backgroundSyncRegistered ? tm("disableOsBackgroundSync") : tm("enableOsBackgroundSync")}</Text>

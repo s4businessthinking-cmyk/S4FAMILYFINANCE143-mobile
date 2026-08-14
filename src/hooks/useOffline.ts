@@ -90,15 +90,8 @@ export function useOffline(familyId?: string | null) {
     const onOnline = () => {
       setOnline(true);
       void refresh();
-      void syncManagerReplay();
+      // No auto replay/refresh — user taps Sync/Refresh when they want.
     };
-    async function syncManagerReplay() {
-      try {
-        await sync.replay();
-      } catch {
-        /* offline wake best-effort */
-      }
-    }
     const onOffline = () => setOnline(false);
     if (typeof globalThis !== "undefined" && "addEventListener" in globalThis) {
       globalThis.addEventListener("online", onOnline);

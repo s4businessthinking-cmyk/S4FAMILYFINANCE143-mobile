@@ -223,8 +223,8 @@ export function MobileGroceryPanel({
         const data = JSON.parse(String(event.data));
         if (data?.type === "grocery.changed") {
           setLastWsEvent(`${data.action || "changed"} · ${data.title || data.entity_type || ""}`);
+          // Do not auto-refresh parent dashboard — user taps Refresh when ready.
           void load();
-          onChanged?.();
         } else if (data?.type === "grocery.subscribed") {
           setLastWsEvent(`subscribed · ${data.subscribers || 0} clients`);
         }
@@ -238,12 +238,8 @@ export function MobileGroceryPanel({
     ws.onclose = () => {
       if (alive) setWsState("disconnected");
     };
-    const pollId = setInterval(() => {
-      if (sub === "COLLAB" || sub === "LISTS" || sub === "ITEMS") void load();
-    }, 30000);
     return () => {
       alive = false;
-      clearInterval(pollId);
       try {
         ws.close();
       } catch {
@@ -251,7 +247,7 @@ export function MobileGroceryPanel({
       }
       setWsState("off");
     };
-  }, [apiBaseUrl, familyId, load, onChanged, sub, token]);
+  }, [apiBaseUrl, familyId, load, sub, token]);
 
   async function selectList(listId: string) {
     setSelectedListId(listId);
